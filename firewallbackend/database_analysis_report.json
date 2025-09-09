@@ -1,0 +1,11 @@
+{
+  "timestamp": "2025-09-01T12:16:41.553439",
+  "database_analysis": {
+    "total_users": 1,
+    "active_users": 1,
+    "inactive_users": 0,
+    "users_with_ssh": 1,
+    "users_without_ssh": 0,
+    "ssh_percentage": 100.0
+  }
+}

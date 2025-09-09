@@ -1,0 +1,80 @@
+
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <style>
+                body { font-family: Arial, sans-serif; margin: 20px; }
+                .header { background-color: #ff4444; color: white; padding: 20px; border-radius: 5px; }
+                .firewall-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+                .interface-table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+                .interface-table th, .interface-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                .interface-table th { background-color: #f5f5f5; }
+                .status-down { color: #ff4444; font-weight: bold; }
+                .summary { background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0; }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>🚨 ALERTE INTERFACES FIREWALL</h1>
+                <p><strong>Alerte:</strong> Démo Alerte</p>
+                <p><strong>Heure de détection:</strong> 01/09/2025 16:00:22</p>
+            </div>
+            
+            <div class="summary">
+                <h2>📊 Résumé</h2>
+                <p><strong>Nombre de firewalls affectés:</strong> 1</p>
+                <p><strong>Total d'interfaces down:</strong> 2</p>
+            </div>
+        
+            <div class="firewall-section">
+                <h3>🖥️ Firewall: Demo FW (192.168.1.100)</h3>
+                <p><strong>Type:</strong> Demo Firewall</p>
+                <p><strong>Interfaces totales:</strong> 5</p>
+                <p><strong>Interfaces up:</strong> 3</p>
+                <p class="status-down"><strong>Interfaces down:</strong> 2</p>
+                
+                <h4>📋 Détails des interfaces down:</h4>
+                <table class="interface-table">
+                    <thead>
+                        <tr>
+                            <th>Interface</th>
+                            <th>Statut</th>
+                            <th>Informations</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            
+                        <tr>
+                            <td><strong>Gi0/1</strong></td>
+                            <td class="status-down">down</td>
+                            <td>Gi0/1     WAN                down         1          a-full  a-100 10/100/1000BaseTX</td>
+                        </tr>
+                
+                        <tr>
+                            <td><strong>Gi0/3</strong></td>
+                            <td class="status-down">administratively down</td>
+                            <td>Gi0/3     DMZ                administratively down 1          a-full  a-100 10/100/1000BaseTX</td>
+                        </tr>
+                
+                    </tbody>
+                </table>
+            </div>
+            
+            <div style="margin-top: 30px; padding: 15px; background-color: #f8f9fa; border-radius: 5px;">
+                <p><strong>⚠️ Actions recommandées:</strong></p>
+                <ul>
+                    <li>Vérifier la connectivité physique des interfaces</li>
+                    <li>Contrôler les configurations des interfaces</li>
+                    <li>Vérifier les logs système pour identifier la cause</li>
+                    <li>Contacter l'équipe réseau si nécessaire</li>
+                </ul>
+            </div>
+            
+            <div style="margin-top: 20px; font-size: 12px; color: #666;">
+                <p>Cette alerte a été générée automatiquement par le système de surveillance des interfaces firewall.</p>
+                <p>Pour plus d'informations, connectez-vous à l'interface d'administration.</p>
+            </div>
+        </body>
+        </html>
+        

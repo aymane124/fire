@@ -1,0 +1,17 @@
+{
+  "timestamp": "2025-09-01T12:17:33.692603",
+  "database_analysis": {
+    "total_users": 1,
+    "active_users": 1,
+    "users_with_ssh": 1,
+    "ssh_percentage": 100.0
+  },
+  "security_analysis": {
+    "users_with_raw_password": 0,
+    "ssh_encrypted_count": 0,
+    "ssh_unencrypted_count": 1
+  },
+  "recommendations": [
+    "Certains mots de passe SSH ne sont pas chiffrés"
+  ]
+}

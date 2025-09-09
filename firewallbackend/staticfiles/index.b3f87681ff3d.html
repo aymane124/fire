@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="
+      default-src 'self';
+      script-src 'self' 'unsafe-eval' 'unsafe-inline';
+      style-src 'self' 'unsafe-inline';
+      img-src 'self' data:;
+      connect-src 'self' http://localhost:8000;
+      worker-src 'self' blob:;
+      child-src 'self' blob:;
+    ">
+    <title>Template Editor</title>
+    <script>
+      window.MonacoEnvironment = {
+        baseUrl: '/static/assets/vs',
+        getWorkerUrl: function(moduleId, label) {
+          if (label === 'json') {
+            return '/static/assets/jsonWorker.js';
+          }
+          if (label === 'css' || label === 'scss' || label === 'less') {
+            return '/static/assets/cssWorker.js';
+          }
+          if (label === 'html' || label === 'handlebars' || label === 'razor') {
+            return '/static/assets/htmlWorker.js';
+          }
+          if (label === 'typescript' || label === 'javascript') {
+            return '/static/assets/tsWorker.js';
+          }
+          return '/static/assets/editorWorker.js';
+        }
+      };
+    </script>
+    <script type="module" crossorigin src="/static/assets/index-l882_IBb.js"></script>
+    <link rel="stylesheet" crossorigin href="/static/assets/index-DBdJH9xF.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

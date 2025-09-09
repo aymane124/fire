@@ -1,0 +1,540 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Leaflet Map Styles */
+.leaflet-container {
+  height: 100%;
+  width: 100%;
+  z-index: 1;
+}
+
+.leaflet-control-container {
+  z-index: 1000;
+}
+
+.leaflet-popup-content-wrapper {
+  border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.leaflet-popup-content {
+  margin: 0;
+  padding: 0;
+}
+
+.leaflet-popup-tip {
+  background: white;
+}
+
+.custom-camera-icon {
+  background: transparent;
+  border: none;
+}
+
+.custom-cluster-icon {
+  background: transparent;
+  border: none;
+}
+
+/* Custom scrollbar for sidebar - Hidden */
+.custom-sidebar-scrollbar::-webkit-scrollbar {
+  width: 0px; /* Completely hide scrollbar */
+  display: none;
+}
+
+.custom-sidebar-scrollbar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Internet Explorer 10+ */
+}
+
+.custom-sidebar-scrollbar::-webkit-scrollbar-track {
+  display: none;
+}
+
+.custom-sidebar-scrollbar::-webkit-scrollbar-thumb {
+  display: none;
+}
+
+.custom-sidebar-scrollbar:hover::-webkit-scrollbar-thumb {
+  display: none;
+}
+
+/* Enhanced Terminal scrollbar styles */
+.terminal-scrollbar::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.terminal-scrollbar::-webkit-scrollbar-track {
+  background: #1a1a1a;
+  border-radius: 6px;
+  margin: 2px;
+}
+
+.terminal-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #4a5568 0%, #2d3748 100%);
+  border-radius: 6px;
+  border: 1px solid #1a1a1a;
+  min-height: 40px;
+}
+
+.terminal-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #718096 0%, #4a5568 100%);
+}
+
+.terminal-scrollbar::-webkit-scrollbar-thumb:active {
+  background: linear-gradient(180deg, #a0aec0 0%, #718096 100%);
+}
+
+.terminal-scrollbar::-webkit-scrollbar-corner {
+  background: #1a1a1a;
+}
+
+/* Firefox scrollbar styles */
+.terminal-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #4a5568 #1a1a1a;
+}
+
+/* Terminal output container styles */
+.terminal-output-container {
+  display: block;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  line-height: 1.5;
+  font-family: 'Consolas', 'Monaco', 'Courier New', 'Fira Code', monospace;
+  font-size: 14px;
+  color: #e5e7eb;
+  will-change: scroll-position;
+  contain: layout style paint;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Optimize scrolling performance */
+.terminal-scrollbar {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+/* Improve text rendering */
+.terminal-output-container span {
+  display: inline;
+  vertical-align: baseline;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "liga" 1, "calt" 1;
+}
+
+/* Virtual scroll container */
+.virtual-scroll-container {
+  position: relative;
+  contain: layout style paint;
+}
+
+/* Optimize large text rendering */
+.terminal-output-container {
+  contain: layout style paint;
+  content-visibility: auto;
+  contain-intrinsic-size: 0 500px;
+}
+
+/* Terminal input styling */
+.terminal-input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #e5e7eb;
+  font-family: 'Consolas', 'Monaco', 'Courier New', 'Fira Code', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  caret-color: #e5e7eb;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.terminal-input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.terminal-input::placeholder {
+  color: #6b7280;
+  opacity: 0.7;
+}
+
+/* Terminal prompt styling */
+.terminal-prompt {
+  color: #10b981;
+  font-weight: bold;
+  font-family: 'Consolas', 'Monaco', 'Courier New', 'Fira Code', monospace;
+  text-shadow: 0 0 5px rgba(16, 185, 129, 0.3);
+}
+
+/* Command execution indicator */
+.command-executing {
+  background: linear-gradient(90deg, #7c3aed 0%, #8b5cf6 50%, #7c3aed 100%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Terminal message types */
+.terminal-message-command {
+  color: #fbbf24;
+  font-weight: 600;
+  text-shadow: 0 0 3px rgba(251, 191, 36, 0.3);
+}
+
+.terminal-message-error {
+  color: #ef4444;
+  font-weight: 500;
+  text-shadow: 0 0 3px rgba(239, 68, 68, 0.3);
+}
+
+.terminal-message-system {
+  color: #10b981;
+  font-weight: 500;
+  text-shadow: 0 0 3px rgba(16, 185, 129, 0.3);
+}
+
+.terminal-message-output {
+  color: #e5e7eb;
+}
+
+/* Scroll indicators */
+.scroll-indicator {
+  position: absolute;
+  right: 8px;
+  width: 8px;
+  background: rgba(74, 85, 104, 0.8);
+  border-radius: 4px;
+  transition: opacity 0.3s ease;
+  z-index: 10;
+}
+
+.scroll-indicator.top {
+  top: 8px;
+  height: 20px;
+}
+
+.scroll-indicator.bottom {
+  bottom: 8px;
+  height: 20px;
+}
+
+/* Terminal container improvements */
+.terminal-container {
+  background: #000000;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+/* Tab styling improvements */
+.terminal-tab {
+  transition: all 0.2s ease;
+  border-bottom: 2px solid transparent;
+}
+
+.terminal-tab.active {
+  border-bottom-color: #3b82f6;
+  background: linear-gradient(180deg, #374151 0%, #1f2937 100%);
+}
+
+.terminal-tab:hover {
+  background: linear-gradient(180deg, #4b5563 0%, #374151 100%);
+}
+
+/* Button improvements */
+.terminal-button {
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.terminal-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.terminal-button:active {
+  transform: translateY(0);
+}
+
+/* Loading animation */
+.terminal-loading {
+  background: linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%);
+  background-size: 200% 100%;
+  animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Connection status indicators */
+.connection-status {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+.connection-status.connected {
+  background: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.5);
+}
+
+.connection-status.disconnected {
+  background: #ef4444;
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Slider styles for settings */
+.slider {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.slider::-webkit-slider-track {
+  background: #374151;
+  height: 8px;
+  border-radius: 4px;
+  border: none;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  height: 20px;
+  width: 20px;
+  border-radius: 50%;
+  border: 2px solid #1f2937;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+}
+
+.slider::-webkit-slider-thumb:hover {
+  background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+  transform: scale(1.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.slider::-webkit-slider-thumb:active {
+  background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+  transform: scale(0.95);
+}
+
+.slider::-moz-range-track {
+  background: #374151;
+  height: 8px;
+  border-radius: 4px;
+  border: none;
+}
+
+.slider::-moz-range-thumb {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  height: 20px;
+  width: 20px;
+  border-radius: 50%;
+  border: 2px solid #1f2937;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+}
+
+.slider::-moz-range-thumb:hover {
+  background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+  transform: scale(1.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.slider::-moz-range-thumb:active {
+  background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+  transform: scale(0.95);
+}
+
+/* Settings modal improvements */
+.settings-section {
+  background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
+  border: 1px solid #4b5563;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.settings-section:hover {
+  border-color: #6b7280;
+  box-shadow: 0 8px 12px -1px rgba(0, 0, 0, 0.15), 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+/* Checkbox improvements */
+input[type="checkbox"] {
+  position: relative;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid #6b7280;
+  border-radius: 4px;
+  background: #374151;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+input[type="checkbox"]:checked {
+  background: #3b82f6;
+  border-color: #3b82f6;
+}
+
+input[type="checkbox"]:checked::after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+input[type="checkbox"]:hover {
+  border-color: #9ca3af;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+input[type="checkbox"]:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+}
+
+/* Select improvements */
+select {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 8px center;
+  background-repeat: no-repeat;
+  background-size: 16px;
+  padding-right: 40px;
+}
+
+select:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+}
+
+/* Button improvements for settings */
+.settings-button {
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+  font-weight: 500;
+}
+
+.settings-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.settings-button:active {
+  transform: translateY(0);
+}
+
+.settings-button.primary {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+}
+
+.settings-button.primary:hover {
+  background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+}
+
+.settings-button.secondary {
+  background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+  color: white;
+}
+
+.settings-button.secondary:hover {
+  background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
+}
+
+.settings-button.export {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  color: white;
+}
+
+.settings-button.export:hover {
+  background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+}
+
+/* Statistics card improvements */
+.stats-card {
+  background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
+  border: 1px solid #4b5563;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.stats-card:hover {
+  border-color: #6b7280;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* Scrollbar for settings modal */
+.settings-modal::-webkit-scrollbar {
+  width: 8px;
+}
+
+.settings-modal::-webkit-scrollbar-track {
+  background: #1f2937;
+  border-radius: 4px;
+}
+
+.settings-modal::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #4b5563 0%, #374151 100%);
+  border-radius: 4px;
+}
+
+.settings-modal::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #6b7280 0%, #4b5563 100%);
+}
+
+/* Responsive improvements */
+@media (max-width: 768px) {
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .settings-section {
+    padding: 1rem;
+  }
+  
+  .slider {
+    height: 6px;
+  }
+  
+  .slider::-webkit-slider-thumb {
+    height: 18px;
+    width: 18px;
+  }
+}
