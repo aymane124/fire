@@ -23,11 +23,29 @@ class InterfaceAlert(models.Model):
     description = models.TextField(blank=True, verbose_name="Description")
     
     # Configuration de l'alerte
-    firewall = models.ForeignKey('firewall_service.Firewall', on_delete=models.CASCADE, verbose_name="Firewall")
+    firewall = models.ForeignKey(
+        'firewall_service.Firewall',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        verbose_name="Firewall (optionnel)"
+    )
+    # Informations complémentaires sur le type et la portée
+    firewall_type = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text='Type de firewall (ex: FortiGate, Cisco, etc.)'
+    )
+    firewalls = models.ManyToManyField(
+        'firewall_service.Firewall',
+        related_name='interface_alerts',
+        verbose_name='Firewalls',
+        blank=True
+    )
     alert_type = models.CharField(max_length=50, choices=ALERT_TYPES, verbose_name="Type d'alerte")
     
     # Paramètres de surveillance
-    check_interval = models.IntegerField(default=300, help_text="Intervalle en secondes (forcé à 5 min)" )
+    check_interval = models.IntegerField(default=360, help_text="Intervalle en secondes (forcé à 6 min)" )
     threshold_value = models.FloatField(null=True, blank=True, help_text="Valeur seuil pour les alertes numériques")
     command_template = models.TextField(default="show system interface", help_text="Commande à exécuter")
     
@@ -82,10 +100,9 @@ class InterfaceAlert(models.Model):
 
     def calculate_next_check(self):
         """Calcule la prochaine date de vérification"""
-        if self.last_check:
-            next_check = self.last_check + timezone.timedelta(seconds=self.check_interval)
-        else:
-            next_check = timezone.now() + timezone.timedelta(seconds=self.check_interval)
+        # Toujours calculer à partir de maintenant pour éviter les problèmes de temps
+        now = timezone.now()
+        next_check = now + timezone.timedelta(seconds=self.check_interval)
         
         self.next_check = next_check
         self.save(update_fields=['next_check'])

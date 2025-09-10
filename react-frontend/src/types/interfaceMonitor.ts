@@ -2,7 +2,7 @@ export interface InterfaceAlert {
   id: string;
   name: string;
   description?: string;
-  firewall: {
+  firewall?: {
     id: string;
     name: string;
     ip_address: string;
@@ -10,7 +10,13 @@ export interface InterfaceAlert {
       id: string;
       name: string;
     };
-  };
+  } | null;
+  firewalls?: Array<{
+    id: string;
+    name: string;
+    ip_address: string;
+  }>;
+  firewall_type?: string;
   alert_type: 'interface_down' | 'interface_up' | 'bandwidth_high' | 'error_count' | 'custom';
   check_interval: number; // in seconds
   threshold_value?: number;

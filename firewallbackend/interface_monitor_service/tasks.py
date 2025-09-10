@@ -41,24 +41,116 @@ def check_firewall_interfaces(alert_id: str) -> Dict[str, Any]:
                 'error': 'Alerte non trouvée ou inactive'
             }
         
-        # Créer le service de surveillance
-        monitor_service = InterfaceMonitorService(alert)
-        
-        # Exécuter la vérification de manière asynchrone
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        
+        # Construire la liste des firewalls cibles
+        from firewall_service.models import Firewall
+        targets = []
+        if alert.firewall:
+            targets.append(alert.firewall)
+        # M2M explicites
         try:
-            result = loop.run_until_complete(monitor_service.check_interfaces())
-        finally:
-            loop.close()
-        
-        logger.info(f"Vérification terminée pour l'alerte {alert_id}: {result}")
-        
-        # Programmer la prochaine vérification
-        schedule_next_check(alert_id)
-        
-        return result
+            targets.extend(list(alert.firewalls.all()))
+        except Exception:
+            pass
+        # Par type (optionnel): rechercher par nom de type case-insensitive
+        fw_type = (alert.firewall_type or '').strip()
+        if fw_type:
+            qs = Firewall.objects.all()
+            # Essayer de résoudre par relation si le modèle a firewall_type.name
+            try:
+                targets.extend(list(qs.filter(firewall_type__name__iexact=fw_type)))
+            except Exception:
+                # Fallback: si firewall.firewall_type est un simple champ texte
+                try:
+                    targets.extend(list(qs.filter(firewall_type__iexact=fw_type)))
+                except Exception:
+                    pass
+        # Scope filtering by owner
+        try:
+            targets = [fw for fw in targets if getattr(fw, 'owner_id', None) == alert.created_by_id]
+        except Exception:
+            pass
+        # Dédupliquer par id
+        uniq = {}
+        for fw in targets:
+            uniq[str(getattr(fw, 'id', fw))] = fw
+        target_firewalls = list(uniq.values())
+
+        if not target_firewalls:
+            logger.warning(f"Aucune cible trouvée pour l'alerte {alert_id}")
+            return {'success': False, 'error': 'Aucune cible'}
+
+        results_agg = {
+            'success': True,
+            'targets': [],
+            'interfaces_checked': 0,
+            'alerts_triggered': 0,
+            'emails_sent': 0,
+        }
+        # Pour agrégation email
+        aggregate_interfaces: list = []
+        aggregate_alerts_triggered: list = []
+
+        # Exécuter séquentiellement sur chaque firewall cible
+        for fw in target_firewalls:
+            try:
+                # Instancier un service par cible
+                monitor_service = InterfaceMonitorService(alert)
+                # Remplacer la cible courante
+                monitor_service.firewall = fw
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    result = loop.run_until_complete(monitor_service.check_interfaces())
+                finally:
+                    loop.close()
+                results_agg['targets'].append({
+                    'firewall': getattr(fw, 'name', str(getattr(fw, 'id', 'unknown'))),
+                    'result': result
+                })
+                if result.get('success'):
+                    results_agg['interfaces_checked'] += int(result.get('interfaces_checked', 0))
+                    results_agg['alerts_triggered'] += int(result.get('alerts_triggered', 0))
+                    results_agg['emails_sent'] += int(result.get('emails_sent', 0))
+                    # Agréger pour email unique si demandé
+                    try:
+                        if (alert.conditions or {}).get('aggregate_email'):
+                            aggregate_interfaces.extend(result.get('interfaces') or [])
+                            # Reconstruire alerts_triggered minimal depuis interfaces DOWN
+                            down = [i for i in (result.get('interfaces') or []) if i.get('status') == 'down']
+                            for di in down:
+                                aggregate_alerts_triggered.append({'interface': di, 'reason': 'Interface down', 'alert_type': alert.alert_type})
+                    except Exception:
+                        pass
+                else:
+                    results_agg['success'] = False
+            except Exception as e:
+                logger.error(f"Erreur exécution cible {getattr(fw, 'name', 'unknown')}: {str(e)}")
+                results_agg['targets'].append({
+                    'firewall': getattr(fw, 'name', str(getattr(fw, 'id', 'unknown'))),
+                    'error': str(e)
+                })
+                results_agg['success'] = False
+
+        # Si agrégation demandée, envoyer un seul email récapitulatif
+        try:
+            if (alert.conditions or {}).get('aggregate_email'):
+                from .alert_service import AlertEmailService
+                email_service = AlertEmailService(alert)
+                recipients = alert.get_recipients()
+                _ = asyncio.new_event_loop()
+                # Utiliser une boucle courte pour appeler la coroutine d'envoi
+                loop = _
+                asyncio.set_event_loop(loop)
+                try:
+                    loop.run_until_complete(email_service.send_interface_alert(aggregate_interfaces, aggregate_alerts_triggered, recipients=recipients))
+                finally:
+                    loop.close()
+        except Exception as e:
+            logger.error(f"Erreur envoi email agrégé: {str(e)}")
+
+        logger.info(f"Vérification terminée pour l'alerte {alert_id}: {results_agg}")
+        # La prochaine vérification est déjà programmée dans services.py
+        return results_agg
         
     except Exception as e:
         error_msg = f"Erreur lors de la vérification des interfaces: {str(e)}"
@@ -133,40 +225,97 @@ def check_all_active_alerts() -> Dict[str, Any]:
             next_check__lte=now
         ).select_related('firewall', 'firewall__firewall_type')
         
-        logger.info(f"{alerts_to_check.count()} alertes à vérifier")
+        logger.info(f"Vérification à {now}: {alerts_to_check.count()} alertes à vérifier")
+        
+        # Log des détails pour le débogage
+        for alert in alerts_to_check:
+            logger.info(f"  - {alert.name}: next_check={alert.next_check}, last_check={alert.last_check}")
         
         results = []
         for alert in alerts_to_check:
             try:
                 # Exécuter la vérification immédiatement (sans Celery)
-                monitor_service = InterfaceMonitorService(alert)
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
+                # Résolution dynamique des cibles (single/M2M/type)
+                from firewall_service.models import Firewall
+                targets = []
+                if alert.firewall:
+                    targets.append(alert.firewall)
                 try:
-                    result = loop.run_until_complete(monitor_service.check_interfaces())
-                    results.append({
-                        'alert_id': str(alert.id),
-                        'alert_name': alert.name,
-                        'firewall': alert.firewall.name,
-                        'status': 'completed' if result.get('success') else 'failed',
-                        'alerts_triggered': result.get('alerts_triggered', 0)
-                    })
-                finally:
-                    loop.close()
+                    targets.extend(list(alert.firewalls.all()))
+                except Exception:
+                    pass
+                fw_type = (alert.firewall_type or '').strip()
+                if fw_type:
+                    try:
+                        targets.extend(list(Firewall.objects.filter(firewall_type__name__iexact=fw_type)))
+                    except Exception:
+                        try:
+                            targets.extend(list(Firewall.objects.filter(firewall_type__iexact=fw_type)))
+                        except Exception:
+                            pass
+                # Scope filtering by owner
+                try:
+                    targets = [fw for fw in targets if getattr(fw, 'owner_id', None) == alert.created_by_id]
+                except Exception:
+                    pass
+                # Dédupliquer
+                uniq = {}
+                for fw in targets:
+                    uniq[str(getattr(fw, 'id', fw))] = fw
+                target_firewalls = list(uniq.values())
+
+                if not target_firewalls:
+                    logger.warning(f"Aucune cible pour {alert.name}")
+                    continue
+
+                for fw in target_firewalls:
+                    monitor_service = InterfaceMonitorService(alert)
+                    monitor_service.firewall = fw
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    try:
+                        result = loop.run_until_complete(monitor_service.check_interfaces())
+                        results.append({
+                            'alert_id': str(alert.id),
+                            'alert_name': alert.name,
+                            'firewall': getattr(fw, 'name', 'unknown'),
+                            'status': 'completed' if result.get('success') else 'failed',
+                            'alerts_triggered': result.get('alerts_triggered', 0),
+                            'emails_sent': result.get('emails_sent', 0)
+                        })
+                        # Agréger si demandé
+                        try:
+                            if (alert.conditions or {}).get('aggregate_email'):
+                                from .alert_service import AlertEmailService
+                                # Accumuler dans un buffer par alerte (simplifié ici: ignorer et laisser check_firewall_interfaces gérer)
+                                pass
+                        except Exception:
+                            pass
+                    finally:
+                        loop.close()
             except Exception as e:
                 logger.error(f"Erreur lors de la vérification pour {alert.name}: {str(e)}")
+                
+                # Programmer la prochaine vérification en cas d'erreur
+                try:
+                    schedule_next_check(str(alert.id))
+                except:
+                    pass
+                
                 results.append({
                     'alert_id': str(alert.id),
                     'alert_name': alert.name,
-                    'firewall': alert.firewall.name,
+                    'firewall': getattr(getattr(alert, 'firewall', None), 'name', 'unknown'),
                     'status': 'error',
                     'error': str(e)
                 })
         
         summary = {
             'total_alerts': len(alerts_to_check),
-            'scheduled': len([r for r in results if r['status'] == 'scheduled']),
+            'completed': len([r for r in results if r['status'] == 'completed']),
+            'failed': len([r for r in results if r['status'] == 'failed']),
             'errors': len([r for r in results if r['status'] == 'error']),
+            'total_emails_sent': sum([r.get('emails_sent', 0) for r in results]),
             'results': results
         }
         
@@ -269,25 +418,56 @@ def test_alert(alert_id: str) -> Dict[str, Any]:
                 'error': 'Alerte non trouvée'
             }
         
-        # Créer le service de surveillance
-        monitor_service = InterfaceMonitorService(alert)
-        
-        # Exécuter la vérification de manière asynchrone
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        
+        # Résoudre les cibles (single/M2M/type)
+        from firewall_service.models import Firewall
+        targets = []
+        if alert.firewall:
+            targets.append(alert.firewall)
         try:
-            result = loop.run_until_complete(monitor_service.check_interfaces())
-        finally:
-            loop.close()
-        
-        logger.info(f"Test de l'alerte {alert_id} terminé: {result}")
-        
-        return {
+            targets.extend(list(alert.firewalls.all()))
+        except Exception:
+            pass
+        fw_type = (alert.firewall_type or '').strip()
+        if fw_type:
+            try:
+                targets.extend(list(Firewall.objects.filter(firewall_type__name__iexact=fw_type)))
+            except Exception:
+                try:
+                    targets.extend(list(Firewall.objects.filter(firewall_type__iexact=fw_type)))
+                except Exception:
+                    pass
+        uniq = {}
+        for fw in targets:
+            uniq[str(getattr(fw, 'id', fw))] = fw
+        target_firewalls = list(uniq.values())
+
+        if not target_firewalls:
+            return {'success': False, 'error': 'Aucune cible trouvée', 'timestamp': timezone.now().isoformat()}
+
+        aggregated = {
             'success': True,
-            'test_result': result,
+            'targets': [],
             'timestamp': timezone.now().isoformat()
         }
+
+        for fw in target_firewalls:
+            monitor_service = InterfaceMonitorService(alert)
+            monitor_service.firewall = fw
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                result = loop.run_until_complete(monitor_service.check_interfaces())
+                aggregated['targets'].append({
+                    'firewall': getattr(fw, 'name', 'unknown'),
+                    'result': result
+                })
+                if not result.get('success'):
+                    aggregated['success'] = False
+            finally:
+                loop.close()
+
+        logger.info(f"Test de l'alerte {alert_id} terminé: {aggregated}")
+        return aggregated
         
     except Exception as e:
         error_msg = f"Erreur lors du test de l'alerte: {str(e)}"
@@ -441,12 +621,13 @@ def initialize_monitoring() -> Dict[str, Any]:
 
 
 def _runner_loop():
-    default_interval = 60
+    default_interval = 360  # Vérifier toutes les 6 minutes
     logger.info("Interface monitor background runner démarré")
     while True:
         try:
-            # Stagger: sleep a small random jitter between alerts
+            # Vérifier toutes les alertes actives qui doivent être vérifiées
             summary = check_all_active_alerts()
+            
             # Periodic retention cleanup once per day window
             try:
                 now = timezone.now()
@@ -455,16 +636,14 @@ def _runner_loop():
                     cleanup_old_executions(days_to_keep=30)
             except Exception:
                 pass
-            # If nothing due, sleep longer
-            total = summary.get('total_alerts', 0)
-            scheduled = summary.get('scheduled', 0)
-            completed = summary.get('completed', 0) if 'completed' in summary else 0
-            if scheduled == 0 and completed == 0:
-                time.sleep(default_interval)
-            else:
-                time.sleep(10)
+            
+            # Toujours dormir 30 secondes pour une vérification régulière
+            time.sleep(default_interval)
+            
         except Exception as e:
             logger.error(f"Erreur runner interface monitor: {str(e)}")
+            # En cas d'erreur, attendre plus longtemps avant de réessayer
+            time.sleep(60)
         
 
 
@@ -479,3 +658,32 @@ def _start_background_runner():
         logger.info("Runner périodique des alertes d'interface initialisé")
     except Exception as e:
         logger.error(f"Impossible de démarrer le runner périodique: {str(e)}")
+
+
+def start_monitoring_system():
+    """
+    Démarre le système de monitoring des interfaces.
+    Cette fonction doit être appelée au démarrage de l'application.
+    """
+    try:
+        logger.info("Démarrage du système de monitoring des interfaces")
+        
+        # Initialiser le monitoring
+        init_result = initialize_monitoring()
+        logger.info(f"Initialisation du monitoring: {init_result}")
+        
+        # Démarrer le runner en arrière-plan
+        _start_background_runner()
+        
+        return {
+            'success': True,
+            'message': 'Système de monitoring démarré avec succès',
+            'initialization': init_result
+        }
+        
+    except Exception as e:
+        logger.error(f"Erreur lors du démarrage du système de monitoring: {str(e)}")
+        return {
+            'success': False,
+            'error': str(e)
+        }

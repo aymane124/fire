@@ -30,7 +30,29 @@ const InterfaceAlerts: React.FC = () => {
   const [alerts, setAlerts] = useState<InterfaceAlert[]>([]);
   const [executions, setExecutions] = useState<AlertExecution[]>([]);
   const [firewalls, setFirewalls] = useState<Firewall[]>([]);
+  const firewallsByTypeCount = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const fw of firewalls) {
+      const typeName = typeof fw.firewall_type === 'string' ? fw.firewall_type : (fw.firewall_type as any)?.name;
+      const key = (typeName || '').toString();
+      if (!key) continue;
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    return counts;
+  }, [firewalls]);
   const [users, setUsers] = useState<User[]>([]);
+  const [fwTypes, setFwTypes] = useState<Array<{ id: string; name: string }>>([]);
+  const uniqueFwTypes = useMemo(() => {
+    const seen = new Set<string>();
+    const list: Array<{ id: string; name: string }> = [];
+    for (const t of fwTypes) {
+      if (t?.name && !seen.has(t.name)) {
+        seen.add(t.name);
+        list.push(t);
+      }
+    }
+    return list;
+  }, [fwTypes]);
   const [stats, setStats] = useState<MonitoringStats | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [serviceAvailable, setServiceAvailable] = useState(true);
@@ -39,6 +61,7 @@ const InterfaceAlerts: React.FC = () => {
     name: '',
     description: '',
     firewall: '',
+    firewall_type: '',
     alert_type: 'interface_down',
     check_interval: 300, // 5 minutes in seconds
     threshold_value: undefined,
@@ -102,6 +125,10 @@ const InterfaceAlerts: React.FC = () => {
       setUsers(ensureArray(usersData));
       setStats(statsData);
       setServiceAvailable(true);
+      try {
+        const types = await firewallService.getFirewallTypes();
+        setFwTypes(types || []);
+      } catch {}
     } catch (e: any) {
       if (e.message?.includes('Service not available')) {
         setServiceAvailable(false);
@@ -120,7 +147,7 @@ const InterfaceAlerts: React.FC = () => {
 
   const submit = async () => {
     try {
-      if (!form.name || !form.firewall || !form.alert_type || !form.check_interval) {
+      if (!form.name || !form.alert_type || !form.check_interval) {
         toast.error('Champs requis manquants');
         return;
       }
@@ -135,35 +162,54 @@ const InterfaceAlerts: React.FC = () => {
         conditions.commands = cmdList;
       }
 
-      const payload = {
+      const payload: CreateAlertPayload = {
         name: form.name,
         description: form.description,
         firewall: form.firewall, // default single firewall; overridden when multiple selected
+        firewall_type: (form.firewall_type || '').trim() || undefined,
         alert_type: form.alert_type,
         check_interval: 300, // fixed 5 minutes
         threshold_value: form.threshold_value,
         command_template: form.command_template,
-        conditions,
+        conditions: {
+          ...conditions,
+          ...(form.conditions || {})
+        },
         recipients: form.recipients,
         include_admin: form.include_admin,
         include_superuser: form.include_superuser
       };
 
-      // If user selected multiple firewalls, create one alert per firewall
-      const firewallIds = selectedFirewalls.length > 0 ? selectedFirewalls : (form.firewall ? [form.firewall] : []);
-      if (firewallIds.length === 0) {
-        toast.error('Veuillez sélectionner au moins un pare-feu');
+      const hasTargets = (selectedFirewalls.length > 0) || !!form.firewall || !!(form.firewall_type && form.firewall_type.trim());
+      if (!hasTargets) {
+        toast.error('Définissez une cible: sélection multiple, pare-feu unique, ou type');
         return;
       }
 
       const createdAlerts: any[] = [];
-      for (const fwId of firewallIds) {
-        const perFwPayload = { ...payload, firewall: fwId } as any;
+      if (selectedFirewalls.length > 0) {
+        // Create ONE alert targeting multiple firewalls via M2M
+        const onePayload = { ...payload, firewalls: selectedFirewalls } as any;
+        try {
+          const created = await interfaceAlertService.create(onePayload);
+          createdAlerts.push(created);
+        } catch (e: any) {
+          toast.error('Erreur création (sélection multiple)');
+        }
+      } else if (form.firewall) {
+        const perFwPayload = { ...payload, firewall: form.firewall } as any;
         try {
           const created = await interfaceAlertService.create(perFwPayload);
           createdAlerts.push(created);
         } catch (e: any) {
-          toast.error(`Erreur création pour firewall ${fwId}`);
+          toast.error('Erreur création (pare-feu unique)');
+        }
+      } else {
+        try {
+          const created = await interfaceAlertService.create(payload);
+          createdAlerts.push(created);
+        } catch (e: any) {
+          toast.error('Erreur création (type de pare-feu)');
         }
       }
       if (createdAlerts.length > 0) {
@@ -174,6 +220,7 @@ const InterfaceAlerts: React.FC = () => {
         name: '',
         description: '',
         firewall: '',
+        firewall_type: '',
         alert_type: 'interface_down',
         check_interval: 300,
         threshold_value: undefined,
@@ -408,6 +455,23 @@ const InterfaceAlerts: React.FC = () => {
                   ))}
                 </select>
               </div>
+              <div className="mt-3">
+                <label className="block text-sm font-medium text-slate-700 mb-2">Type de pare-feu (optionnel)</label>
+                <select
+                  className="w-full border rounded-lg p-3"
+                  value={form.firewall_type || ''}
+                  onChange={(e) => setForm((f) => ({ ...f, firewall_type: e.target.value }))}
+                >
+                  <option value="">Sélectionner un type</option>
+                  {uniqueFwTypes.map((t) => {
+                    const c = firewallsByTypeCount.get(t.name) || 0;
+                    return (
+                      <option key={t.id} value={t.name}>{t.name} ({c})</option>
+                    );
+                  })}
+                </select>
+                <p className="text-xs text-slate-500 mt-1">Si défini, l'alerte s'exécutera sur tous les pare-feux de ce type.</p>
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">Intervalle de vérification</label>
@@ -457,7 +521,25 @@ const InterfaceAlerts: React.FC = () => {
                 onChange={(e) => setCommandsText(e.target.value)}
               />
             </div>
-            <div />
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Options d'email</label>
+              <div className="flex items-center gap-2">
+                <input
+                  id="aggregate_email"
+                  type="checkbox"
+                  checked={Boolean((form as any).conditions?.aggregate_email)}
+                  onChange={(e) => setForm((f) => ({
+                    ...f,
+                    conditions: {
+                      ...(f.conditions || {}),
+                      aggregate_email: e.target.checked
+                    }
+                  }))}
+                />
+                <label htmlFor="aggregate_email" className="text-sm text-slate-700">Envoyer un seul email cumulatif</label>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">Cochez pour recevoir un email unique regroupant les résultats de tous les pare-feux ciblés.</p>
+            </div>
           </div>
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-slate-700 mb-2">Destinataires</label>
@@ -540,6 +622,7 @@ const InterfaceAlerts: React.FC = () => {
                 <tr className="text-left text-slate-600 border-b">
                   <th className="p-3">Nom</th>
                   <th className="p-3">Pare-feu</th>
+                  <th className="p-3">Portée</th>
                   <th className="p-3">Type</th>
                   <th className="p-3">Statut</th>
                   <th className="p-3">Intervalle</th>
@@ -561,9 +644,32 @@ const InterfaceAlerts: React.FC = () => {
                     </td>
                     <td className="p-3">
                       <div>
-                        <div className="font-medium">{alert.firewall.name}</div>
-                        <div className="text-xs text-slate-500">{alert.firewall.ip_address}</div>
+                        {alert.firewalls && alert.firewalls.length > 0 ? (
+                          <div className="space-y-1">
+                            <div className="font-medium">{alert.firewalls.length} pare-feux</div>
+                            <div className="flex flex-wrap gap-1">
+                              {alert.firewalls.slice(0, 3).map((fw) => (
+                                <span key={fw.id} className="px-2 py-0.5 text-xs rounded bg-slate-100 text-slate-700">{fw.name}</span>
+                              ))}
+                              {alert.firewalls.length > 3 && (
+                                <span className="px-2 py-0.5 text-xs rounded bg-slate-50 text-slate-500">+{alert.firewalls.length - 3} autres</span>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            <div className="font-medium">{alert.firewall?.name || '—'}</div>
+                            <div className="text-xs text-slate-500">{alert.firewall?.ip_address || ''}</div>
+                          </div>
+                        )}
                       </div>
+                    </td>
+                    <td className="p-3">
+                      {alert.firewall_type ? (
+                        <span className="px-2 py-1 text-xs rounded bg-slate-100 text-slate-700">type: {alert.firewall_type}</span>
+                      ) : (
+                        <span className="text-xs text-slate-400">—</span>
+                      )}
                     </td>
                     <td className="p-3">
                       <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">

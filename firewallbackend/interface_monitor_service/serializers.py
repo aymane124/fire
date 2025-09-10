@@ -54,6 +54,7 @@ class InterfaceAlertSerializer(serializers.ModelSerializer):
     # Champs calculés et relations
     recipients = UserSerializer(many=True, read_only=True)
     firewall = FirewallSerializer(read_only=True)
+    firewalls = FirewallSerializer(many=True, read_only=True)
     created_by = UserSerializer(read_only=True)
     last_check = serializers.DateTimeField(read_only=True)
     next_check = serializers.DateTimeField(read_only=True)
@@ -67,7 +68,7 @@ class InterfaceAlertSerializer(serializers.ModelSerializer):
     class Meta:
         model = InterfaceAlert
         fields = [
-            'id', 'name', 'description', 'firewall', 'alert_type', 
+            'id', 'name', 'description', 'firewall', 'firewalls', 'firewall_type', 'alert_type', 
             'check_interval', 'threshold_value', 'command_template', 
             'conditions', 'recipients', 'include_admin', 'include_superuser',
             'is_active', 'last_check', 'last_status', 'next_check',
@@ -119,6 +120,35 @@ class InterfaceAlertSerializer(serializers.ModelSerializer):
         if not isinstance(value, dict):
             raise serializers.ValidationError("Les conditions doivent être un objet JSON")
         
+        # Validation de sécurité: commands allowlist & limitations
+        commands = value.get('commands')
+        if commands is not None:
+            if not isinstance(commands, list):
+                raise serializers.ValidationError("commands doit être une liste")
+            if len(commands) > 10:
+                raise serializers.ValidationError("Trop de commandes (max 10)")
+            allowed_prefixes = [
+                'show ', 'get ', 'diagnose hardware', 'diagnose netlink', 'config global', 'execute ping'
+            ]
+            for cmd in commands:
+                if not isinstance(cmd, str) or not cmd.strip():
+                    raise serializers.ValidationError("Commande invalide")
+                c = cmd.strip().lower()
+                if len(c) > 200:
+                    raise serializers.ValidationError("Commande trop longue")
+                if not any(c.startswith(p) for p in allowed_prefixes):
+                    raise serializers.ValidationError("Commande non autorisée pour des raisons de sécurité")
+        
+        # Webhook URL allowlist
+        webhook_url = value.get('webhook_url')
+        if webhook_url:
+            if not isinstance(webhook_url, str):
+                raise serializers.ValidationError("webhook_url doit être une chaîne")
+            from urllib.parse import urlparse
+            u = urlparse(webhook_url)
+            if u.scheme not in ('https',):
+                raise serializers.ValidationError("webhook_url doit être en HTTPS")
+        
         # Vérifier la structure des conditions si elles sont définies
         if value:
             required_fields = ['field', 'operator', 'value']
@@ -144,7 +174,7 @@ class AlertCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = InterfaceAlert
         fields = [
-            'name', 'description', 'firewall', 'alert_type', 
+            'name', 'description', 'firewall', 'firewalls', 'firewall_type', 'alert_type', 
             'check_interval', 'threshold_value', 'command_template', 
             'conditions', 'recipients', 'include_admin', 'include_superuser',
             'is_active'
@@ -152,25 +182,39 @@ class AlertCreateSerializer(serializers.ModelSerializer):
     
     def validate(self, attrs):
         """Validation globale de l'alerte"""
-        # Vérifier que le firewall est de type FortiGate si nécessaire
+        # Ciblage: au moins l'un des trois doit être fourni
+        has_single = bool(attrs.get('firewall'))
+        has_many = bool(attrs.get('firewalls'))
+        has_type = bool((attrs.get('firewall_type') or '').strip())
+        if not (has_single or has_many or has_type):
+            raise serializers.ValidationError("Définissez une cible: firewall, firewalls ou firewall_type")
+
+        # Si firewall_type fourni, normaliser
+        if has_type:
+            attrs['firewall_type'] = (attrs.get('firewall_type') or '').strip()
+            # Par défaut, activer l'email cumulatif si l'alerte ne cible QUE un type
+            if not has_single and not has_many:
+                conditions = attrs.get('conditions') or {}
+                if isinstance(conditions, dict):
+                    conditions.setdefault('aggregate_email', True)
+                    attrs['conditions'] = conditions
+
+        # Vérifier que le firewall est de type FortiGate si nécessaire (seulement si single fourni)
         firewall = attrs.get('firewall')
         if firewall and hasattr(firewall, 'firewall_type'):
-            firewall_type = firewall.firewall_type.name.lower()
-            if 'forti' not in firewall_type and attrs.get('command_template') == 'show system interface':
+            firewall_type_name = getattr(getattr(firewall, 'firewall_type', None), 'name', '')
+            if isinstance(firewall_type_name, str) and 'forti' not in firewall_type_name.lower() and attrs.get('command_template') == 'show system interface':
                 raise serializers.ValidationError(
                     "La commande 'show system interface' est spécifique aux firewalls FortiGate"
                 )
-        
+
         # Vérifier que les destinataires sont définis
         recipients = attrs.get('recipients', [])
         include_admin = attrs.get('include_admin', True)
         include_superuser = attrs.get('include_superuser', True)
-        
         if not recipients and not include_admin and not include_superuser:
-            raise serializers.ValidationError(
-                "Au moins un destinataire doit être défini"
-            )
-        
+            raise serializers.ValidationError("Au moins un destinataire doit être défini")
+
         return attrs
 
 
@@ -180,15 +224,30 @@ class AlertUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = InterfaceAlert
         fields = [
-            'name', 'description', 'alert_type', 'check_interval', 
+            'name', 'description', 'firewall', 'firewalls', 'firewall_type', 'alert_type', 'check_interval', 
             'threshold_value', 'command_template', 'conditions', 
             'recipients', 'include_admin', 'include_superuser', 'is_active'
         ]
     
     def validate(self, attrs):
         """Validation globale de la mise à jour"""
-        # Même validation que pour la création
-        return super().validate(attrs)
+        # Si aucune cible n'est transmise, on ne change pas; sinon valider au moins une cible
+        has_any_target_field = any(k in attrs for k in ('firewall', 'firewalls', 'firewall_type'))
+        if has_any_target_field:
+            has_single = 'firewall' in attrs and bool(attrs.get('firewall'))
+            has_many = 'firewalls' in attrs and bool(attrs.get('firewalls'))
+            has_type = 'firewall_type' in attrs and bool((attrs.get('firewall_type') or '').strip())
+            if not (has_single or has_many or has_type):
+                raise serializers.ValidationError("Définissez une cible: firewall, firewalls ou firewall_type")
+            if has_type:
+                attrs['firewall_type'] = (attrs.get('firewall_type') or '').strip()
+                # Activer l'email cumulatif si passage à un ciblage par type uniquement
+                if not has_single and not has_many:
+                    conditions = attrs.get('conditions') or {}
+                    if isinstance(conditions, dict):
+                        conditions.setdefault('aggregate_email', True)
+                        attrs['conditions'] = conditions
+        return attrs
 
 
 class AlertSummarySerializer(serializers.Serializer):

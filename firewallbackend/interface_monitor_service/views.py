@@ -47,7 +47,7 @@ class InterfaceAlertViewSet(viewsets.ModelViewSet):
             )
         else:
             return InterfaceAlert.objects.filter(
-                Q(recipients=user) | Q(include_admin=True) | Q(include_superuser=True)
+                Q(recipients=user) | Q(include_admin=True) | Q(include_superuser=True) | Q(created_by=user)
             ).select_related(
                 'firewall', 'firewall__firewall_type', 'firewall__data_center', 'created_by'
             )
@@ -62,13 +62,26 @@ class InterfaceAlertViewSet(viewsets.ModelViewSet):
         """Assigne automatiquement l'utilisateur créateur"""
         serializer.save(created_by=self.request.user)
     
+    def perform_update(self, serializer):
+        alert = self.get_object()
+        user = self.request.user
+        if not (user.is_superuser or alert.created_by_id == user.id):
+            return Response({'error': 'Permission refusée'}, status=status.HTTP_403_FORBIDDEN)
+        serializer.save()
+    
+    def perform_destroy(self, instance):
+        user = self.request.user
+        if not (user.is_superuser or instance.created_by_id == user.id):
+            return Response({'error': 'Permission refusée'}, status=status.HTTP_403_FORBIDDEN)
+        instance.delete()
+    
     @action(detail=True, methods=['post'])
     def test(self, request, pk=None):
         """Teste une alerte en l'exécutant immédiatement"""
         alert = self.get_object()
         
         # Vérifier les permissions
-        if not request.user.is_superuser and request.user not in alert.recipients.all():
+        if not request.user.is_superuser and request.user not in alert.recipients.all() and request.user != alert.created_by:
             return Response(
                 {'error': 'Permission refusée'}, 
                 status=status.HTTP_403_FORBIDDEN
@@ -95,6 +108,9 @@ class InterfaceAlertViewSet(viewsets.ModelViewSet):
     def activate(self, request, pk=None):
         """Active une alerte"""
         alert = self.get_object()
+        user = request.user
+        if not (user.is_superuser or alert.created_by_id == user.id):
+            return Response({'error': 'Permission refusée'}, status=status.HTTP_403_FORBIDDEN)
         
         try:
             alert.is_active = True
@@ -117,6 +133,9 @@ class InterfaceAlertViewSet(viewsets.ModelViewSet):
     def deactivate(self, request, pk=None):
         """Désactive une alerte"""
         alert = self.get_object()
+        user = request.user
+        if not (user.is_superuser or alert.created_by_id == user.id):
+            return Response({'error': 'Permission refusée'}, status=status.HTTP_403_FORBIDDEN)
         
         try:
             alert.is_active = False
@@ -724,6 +743,35 @@ def cleanup_old_executions(request):
         
     except Exception as e:
         logger.error(f"Erreur lors du nettoyage: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+def start_monitoring_system(request):
+    """Démarre le système de monitoring des interfaces"""
+    if not request.user.is_superuser:
+        return JsonResponse({'error': 'Permission refusée'}, status=403)
+    
+    try:
+        from .tasks import start_monitoring_system
+        
+        # Démarrer le système de monitoring
+        result = start_monitoring_system()
+        
+        if result.get('success'):
+            return JsonResponse({
+                'success': True,
+                'message': 'Système de monitoring démarré avec succès',
+                'result': result
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': result.get('error', 'Erreur inconnue')
+            }, status=500)
+        
+    except Exception as e:
+        logger.error(f"Erreur lors du démarrage du système de monitoring: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
 

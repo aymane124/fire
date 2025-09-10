@@ -22,16 +22,9 @@ class InterfaceMonitorService:
         self.ssh_manager = None
         self.execution = None
         self.parser = None
-        
-        # Initialiser le parser selon le type de firewall
-        if self.firewall.firewall_type.name.lower() in ['forti', 'fortigate']:
-            self.parser = FortiGateInterfaceParser()
-        else:
-            # Parser générique pour les autres types
-            self.parser = FortiGateInterfaceParser()  # Pour l'instant, utiliser le même
     
     async def check_interfaces(self) -> Dict[str, Any]:
-        """Vérifie l'état des interfaces du firewall"""
+        """Vérifie l'état des interfaces pour la cible courante (self.firewall)."""
         try:
             # Créer une entrée d'exécution (ORM via sync_to_async)
             self.execution = await sync_to_async(AlertExecution.objects.create, thread_sensitive=False)(
@@ -182,6 +175,18 @@ class InterfaceMonitorService:
             self.ssh_manager = SimpleSSHSession(self.firewall)
             await self.ssh_manager.connect()
             logger.info(f"Connexion SSH établie au firewall: {self.firewall.name}")
+            # Initialiser le parser maintenant que la cible est connue
+            try:
+                fw_type_name = ''
+                if hasattr(self.firewall, 'firewall_type'):
+                    ft = getattr(self.firewall, 'firewall_type')
+                    fw_type_name = getattr(ft, 'name', ft)
+                if isinstance(fw_type_name, str) and fw_type_name.lower() in ['forti', 'fortigate', 'fortinet', 'fortigate-fw']:
+                    self.parser = FortiGateInterfaceParser()
+                else:
+                    self.parser = FortiGateInterfaceParser()
+            except Exception:
+                self.parser = FortiGateInterfaceParser()
             
         except Exception as e:
             logger.error(f"Erreur de connexion SSH: {str(e)}")
@@ -467,7 +472,11 @@ class InterfaceMonitorService:
     async def _send_alerts(self, interfaces: List[Dict[str, Any]], alerts_triggered: List[Dict[str, Any]]) -> int:
         """Envoie les alertes par email"""
         try:
-            alert_service = AlertEmailService(self.alert)
+            conditions = self.alert.conditions or {}
+            if conditions.get('aggregate_email'):
+                # L'envoi sera effectué en mode agrégé au niveau appelant
+                return 0
+            alert_service = AlertEmailService(self.alert, current_firewall=self.firewall)
             recipients = await sync_to_async(self.alert.get_recipients, thread_sensitive=False)()
             emails_sent = await alert_service.send_interface_alert(interfaces, alerts_triggered, recipients=recipients)
             
@@ -481,7 +490,7 @@ class InterfaceMonitorService:
     async def _send_error_alert(self, error_message: str):
         """Envoie une alerte d'erreur"""
         try:
-            alert_service = AlertEmailService(self.alert)
+            alert_service = AlertEmailService(self.alert, current_firewall=self.firewall)
             await alert_service.send_error_alert(error_message)
             
         except Exception as e:
@@ -536,15 +545,17 @@ class InterfaceMonitorService:
                 global_status = 'mixed'
             
             # Mettre à jour l'alerte (éviter les appels sync dans le contexte async)
-            self.alert.last_check = timezone.now()
+            now = timezone.now()
+            self.alert.last_check = now
             self.alert.last_status = global_status
-            # Imposer un intervalle fixe de 5 minutes
-            fixed_seconds = 300
-            next_check = self.alert.last_check + timezone.timedelta(seconds=fixed_seconds)
+            # Imposer un intervalle fixe de 6 minutes
+            fixed_seconds = 360
+            next_check = now + timezone.timedelta(seconds=fixed_seconds)
             self.alert.next_check = next_check
             await sync_to_async(self.alert.save, thread_sensitive=False)()
             
             logger.info(f"Statut de l'alerte mis à jour: {global_status}")
+            logger.info(f"Prochaine vérification programmée à: {next_check} (dans {fixed_seconds} secondes)")
             
         except Exception as e:
             logger.error(f"Erreur de mise à jour du statut de l'alerte: {str(e)}")
@@ -570,7 +581,7 @@ class InterfaceMonitorService:
         """Retourne un résumé du statut de surveillance"""
         return {
             'alert_name': self.alert.name,
-            'firewall': self.firewall.name,
+            'firewall': getattr(self.firewall, 'name', 'unknown'),
             'last_check': self.alert.last_check,
             'next_check': self.alert.next_check,
             'status': self.alert.last_status,

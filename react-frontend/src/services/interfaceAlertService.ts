@@ -14,6 +14,9 @@ export interface CreateAlertPayload {
   name: string;
   description?: string;
   firewall: string; // This is the firewall ID string
+  // Optional multi-targeting
+  firewalls?: string[];
+  firewall_type?: string;
   alert_type: 'interface_down' | 'interface_up' | 'bandwidth_high' | 'error_count' | 'custom';
   check_interval: number;
   threshold_value?: number;
@@ -70,7 +73,7 @@ export const interfaceAlertService = {
   
   update: async (id: string, payload: Partial<InterfaceAlert>): Promise<InterfaceAlert> => {
     try {
-      const { data } = await api.put(`/interface-monitor/api/alerts/${id}/`, payload);
+      const { data } = await api.patch(`/interface-monitor/api/alerts/${id}/`, payload);
       return data;
     } catch (error: any) {
       if (error.response?.status === 404) {
