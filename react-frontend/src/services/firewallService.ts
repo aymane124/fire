@@ -76,6 +76,28 @@ export const firewallService = {
         }
     },
 
+    getFirewallTypes: async (): Promise<Array<{ id: string; name: string }>> => {
+        try {
+            const response = await api.get('/firewalls/firewall-types/');
+            const data = response.data;
+            const items = Array.isArray(data) ? data : (data?.results || []);
+            return items.map((t: any) => ({ id: t.id, name: t.name }));
+        } catch (error) {
+            // Fallback: infer from existing firewalls if no direct endpoint
+            try {
+                const fwResp = await api.get('/firewalls/firewalls/');
+                const list: any[] = fwResp.data?.results || fwResp.data || [];
+                const rawNames: string[] = list
+                    .map((f: any) => (f?.firewall_type?.name ?? f?.firewall_type ?? '').toString())
+                    .filter((v: string) => Boolean(v));
+                const names: string[] = Array.from(new Set<string>(rawNames));
+                return names.map((n: string, idx: number) => ({ id: String(idx), name: n }));
+            } catch (e) {
+                return [];
+            }
+        }
+    },
+
     getFirewall: async (id: string): Promise<Firewall> => {
         try {
             const response = await api.get(`/firewalls/firewalls/${id}/`);

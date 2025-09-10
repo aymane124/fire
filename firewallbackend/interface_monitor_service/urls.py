@@ -22,6 +22,7 @@ urlpatterns = [
     path('api/monitoring/status/', views.monitoring_status, name='monitoring-status'),
     path('api/monitoring/stats/', views.monitoring_stats, name='monitoring-stats'),
     path('api/monitoring/initialize/', views.initialize_monitoring, name='initialize-monitoring'),
+    path('api/monitoring/start/', views.start_monitoring_system, name='start-monitoring'),
     
     # Endpoints de statistiques
     path('api/stats/summary/', views.stats_summary, name='stats-summary'),

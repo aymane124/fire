@@ -16,9 +16,10 @@ logger = logging.getLogger(__name__)
 class AlertEmailService:
     """Service d'envoi d'alertes par email pour les interfaces"""
     
-    def __init__(self, alert: InterfaceAlert):
+    def __init__(self, alert: InterfaceAlert, current_firewall: Any = None):
         self.alert = alert
-        self.firewall = alert.firewall
+        # Utiliser le firewall courant si fourni (exécution par type), sinon l'attacher de l'alerte
+        self.firewall = current_firewall or alert.firewall
         self.logger = logging.getLogger(__name__)
     
     async def send_interface_alert(self, interfaces: List[Dict[str, Any]], alerts_triggered: List[Dict[str, Any]], recipients: List[Any] = None) -> int:
@@ -167,9 +168,10 @@ class AlertEmailService:
     def _prepare_alert_text(self, interfaces: List[Dict[str, Any]], alerts_triggered: List[Dict[str, Any]]) -> str:
         """Prépare le contenu texte de l'email d'alerte"""
         try:
+            fw_name = getattr(self.firewall, 'name', 'N/A')
             text_content = f"""
 ALERTE: {self.alert.name}
-Firewall: {self.firewall.name}
+Firewall: {fw_name}
 Heure: {timezone.now().strftime('%Y-%m-%d %H:%M:%S')}
 
 Résumé (interfaces down uniquement):
@@ -180,7 +182,7 @@ Interfaces down:
             
             for interface in interfaces:
                 iface_ip = interface.get('ip_address', 'N/A')
-                fw_name = self.firewall.name
+                fw_name = getattr(self.firewall, 'name', 'N/A')
                 text_content += f"- {interface.get('name','N/A')} (IP: {iface_ip}, FW: {fw_name}): down\n"
             
             # Détails succincts seulement pour les interfaces down
@@ -220,9 +222,10 @@ Interfaces down:
     
     def _prepare_error_text(self, error_message: str) -> str:
         """Prépare le contenu texte de l'email d'erreur"""
+        fw_name = getattr(self.firewall, 'name', 'N/A')
         return f"""
 ERREUR: {self.alert.name}
-Firewall: {self.firewall.name}
+Firewall: {fw_name}
 Heure: {timezone.now().strftime('%Y-%m-%d %H:%M:%S')}
 
 Une erreur s'est produite lors de la surveillance des interfaces:
