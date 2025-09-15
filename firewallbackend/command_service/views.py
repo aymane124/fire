@@ -7,7 +7,7 @@ from auth_service.models import SSHUser
 from .models import FirewallCommand
 from .serializers import FirewallCommandSerializer, FirewallCommandExecuteSerializer, FirewallConfigSaveSerializer
 from rest_framework.permissions import IsAuthenticated
-from django.http import FileResponse
+from django.http import HttpResponse
 from django.conf import settings
 import os
 import paramiko
@@ -867,7 +867,9 @@ class FirewallCommandViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_404_NOT_FOUND
                 )
 
-            response = FileResponse(open(filepath, 'rb'))
+            with open(filepath, 'rb') as file:
+                file_content = file.read()
+            response = HttpResponse(file_content, content_type='application/octet-stream')
             response['Content-Disposition'] = f'attachment; filename="{filename}"'
             return response
 
@@ -891,7 +893,9 @@ class FirewallCommandViewSet(viewsets.ModelViewSet):
                     'error': 'Configuration file not found'
                 }, status=status.HTTP_404_NOT_FOUND)
 
-            response = FileResponse(open(filepath, 'rb'))
+            with open(filepath, 'rb') as file:
+                file_content = file.read()
+            response = HttpResponse(file_content, content_type='application/octet-stream')
             response['Content-Disposition'] = f'attachment; filename="{os.path.basename(filepath)}"'
             return response
 

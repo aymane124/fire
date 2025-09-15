@@ -22,7 +22,7 @@ urlpatterns = [
     path('api/history/',    include('history_service.urls')),
     path('api/email/',      include('email_service.urls')),
     path('api/interface-monitor/', include('interface_monitor_service.urls')),
-    # path('api/screenshots/', include('screenshot_service.urls')),  # Commented out - service not implemented
+    path('api/screenshots/', include('screenshot_service.urls')),
 
     path('api/dashboard/',  include('dashboard_service.urls')),
 ]

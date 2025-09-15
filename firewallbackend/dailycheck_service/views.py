@@ -9,7 +9,7 @@ import pandas as pd
 from datetime import datetime
 import os
 import time
-from django.http import FileResponse, HttpResponse
+from django.http import HttpResponse
 from django.conf import settings
 import logging
 import paramiko
@@ -546,7 +546,9 @@ class DailyCheckViewSet(viewsets.ModelViewSet):
             }, status=status.HTTP_404_NOT_FOUND)
 
         try:
-            response = FileResponse(open(daily_check.excel_report, 'rb'))
+            with open(daily_check.excel_report, 'rb') as file:
+                file_content = file.read()
+            response = HttpResponse(file_content, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
             response['Content-Disposition'] = f'attachment; filename="{os.path.basename(daily_check.excel_report)}"'
             
             daily_check.add_to_history(
@@ -649,7 +651,9 @@ class DailyCheckViewSet(viewsets.ModelViewSet):
                 }, status=status.HTTP_404_NOT_FOUND)
 
             # Create file response
-            response = FileResponse(open(report_path, 'rb'))
+            with open(report_path, 'rb') as file:
+                file_content = file.read()
+            response = HttpResponse(file_content, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
             response['Content-Disposition'] = f'attachment; filename="{os.path.basename(report_path)}"'
             
             # Add to history for all related daily checks

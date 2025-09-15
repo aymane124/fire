@@ -19,6 +19,7 @@ import {
   Mail,
   AlertTriangle
 } from 'lucide-react';
+import { Camera } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import inwiLogo from '../assets/inwi-logo.svg';
 
@@ -94,6 +95,7 @@ const Sidebar = ({ onLogout, sidebarOpen, setSidebarOpen }: SidebarProps) => {
         { path: '/profile', icon: User, label: 'Profile', description: 'Gestion du profil' },
         { path: '/history', icon: Clock, label: 'Historique', description: 'Historique des actions' },
         { path: '/terminals', icon: Terminal, label: 'Terminaux', description: 'Accès SSH' },
+        { path: '/screenshot', icon: Camera, label: 'Screenshot', description: 'Prendre une capture' },
       ]
     }
   ];

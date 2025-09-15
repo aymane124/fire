@@ -55,7 +55,7 @@ INSTALLED_APPS = [
 
     'websocket_service.apps.WebsocketServiceConfig',
     'dashboard_service.apps.DashboardServiceConfig',
-    # 'screenshot_service',  # Commented out - service not implemented
+    'screenshot_service',
     'channels',
 ]
 

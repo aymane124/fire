@@ -25,6 +25,7 @@ import AdminLogs from './pages/AdminLogs';
 import AutomatedEmails from './pages/AutomatedEmails';
 import InterfaceAlerts from './pages/InterfaceAlerts';
 import TerminalTabs from './components/TerminalTabs';
+import ScreenshotPage from './pages/ScreenshotPage';
 
 // Protected Route component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -280,6 +281,16 @@ const AppRoutes = () => {
           <ProtectedRoute>
             <AuthenticatedLayout>
               <InterfaceAlerts />
+            </AuthenticatedLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/screenshot"
+        element={
+          <ProtectedRoute>
+            <AuthenticatedLayout>
+              <ScreenshotPage />
             </AuthenticatedLayout>
           </ProtectedRoute>
         }
