@@ -15,6 +15,9 @@ RUN apt-get update \
        default-libmysqlclient-dev \
        curl \
        ca-certificates \
+       wget \
+       gnupg \
+       apt-transport-https \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies first (better layer caching)
@@ -23,6 +26,9 @@ RUN pip install --upgrade pip \
     && pip install -r requirements.txt \
     && pip install uvicorn[standard] \
     && pip install pymysql==1.1.0
+
+# Install Playwright browsers
+RUN playwright install --with-deps
 
 # Copy project
 COPY . /app
