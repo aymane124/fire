@@ -57,7 +57,8 @@ def setup_database():
     print("🚀 Starting database setup...")
     
     # Check if we should reset the database
-    reset_db = input("Do you want to reset the database? (y/N): ").lower().strip()
+    # In Docker environment, skip interactive input and use default behavior
+    reset_db = os.environ.get('RESET_DATABASE', 'n').lower().strip()
     
     if reset_db == 'y':
         if os.path.exists('db.sqlite3'):

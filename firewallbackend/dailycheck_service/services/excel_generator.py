@@ -28,7 +28,7 @@ class ExcelGenerator:
     
     def start_multi_firewall_report(self, firewalls: List, timestamp: str = None) -> str:
         """
-        Démarre un nouveau rapport multi-firewall avec architecture de dossiers respectée
+        Démarre un nouveau rapport multi-firewall avec structure Datacenter/Firewall_Type
         
         Args:
             firewalls: Liste des firewalls pour déterminer la structure de dossiers
@@ -40,9 +40,7 @@ class ExcelGenerator:
         if timestamp is None:
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         
-        # Déterminer la structure de dossiers basée sur les firewalls
-        # Si tous les firewalls sont du même datacenter et type, utiliser cette structure
-        # Sinon, créer un dossier "Multi_DC" ou "Multi_Type"
+        # Analyser les firewalls pour déterminer la structure
         dc_names = set()
         fw_types = set()
         
@@ -52,31 +50,39 @@ class ExcelGenerator:
             dc_names.add(dc_name)
             fw_types.add(fw_type)
         
-        # Déterminer le nom du dossier
+        # Déterminer la structure de dossiers
         if len(dc_names) == 1 and len(fw_types) == 1:
             # Tous les firewalls sont du même datacenter et type
             dc_name = list(dc_names)[0]
             fw_type = list(fw_types)[0]
-            folder_name = f"{dc_name}_{fw_type}"
+            # Structure: Datacenter/Firewall_Type/
+            dc_dir = os.path.join(self.base_dir, dc_name)
+            fw_type_dir = os.path.join(dc_dir, fw_type)
         elif len(dc_names) == 1:
             # Même datacenter, types différents
             dc_name = list(dc_names)[0]
-            folder_name = f"{dc_name}_Multi_Type"
+            # Structure: Datacenter/Multi_Type/
+            dc_dir = os.path.join(self.base_dir, dc_name)
+            fw_type_dir = os.path.join(dc_dir, "Multi_Type")
         elif len(fw_types) == 1:
             # Même type, datacenters différents
             fw_type = list(fw_types)[0]
-            folder_name = f"Multi_DC_{fw_type}"
+            # Structure: Multi_DC/Firewall_Type/
+            dc_dir = os.path.join(self.base_dir, "Multi_DC")
+            fw_type_dir = os.path.join(dc_dir, fw_type)
         else:
             # Datacenters et types différents
-            folder_name = "Multi_DC_Multi_Type"
+            # Structure: Multi_DC/Multi_Type/
+            dc_dir = os.path.join(self.base_dir, "Multi_DC")
+            fw_type_dir = os.path.join(dc_dir, "Multi_Type")
         
-        # Créer la structure de dossiers
-        report_dir = os.path.join(self.base_dir, folder_name)
-        os.makedirs(report_dir, exist_ok=True)
+        # Créer les dossiers s'ils n'existent pas
+        os.makedirs(dc_dir, exist_ok=True)
+        os.makedirs(fw_type_dir, exist_ok=True)
         
         # Créer le nom du fichier
         filename = f'daily_check_multi_{timestamp}.xlsx'
-        self.current_filepath = os.path.join(report_dir, filename)
+        self.current_filepath = os.path.join(fw_type_dir, filename)
         
         # Créer le classeur Excel
         self.workbook = Workbook()

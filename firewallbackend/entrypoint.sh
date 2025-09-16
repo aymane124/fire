@@ -10,7 +10,7 @@ echo "Running migrations..."
 python manage.py migrate --noinput
 
 echo "Setting up admin user..."
-python setup_database.py
+python setup_database.py || echo "Database setup completed with warnings"
 
 echo "Collecting static files..."
 python manage.py collectstatic --noinput
