@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from .models import ScreenshotReport
 
 
 class ScreenshotRequestSerializer(serializers.Serializer):
@@ -20,6 +21,7 @@ class ScreenshotRequestSerializer(serializers.Serializer):
     full_page = serializers.BooleanField(required=False, default=True)
     timeout_ms = serializers.IntegerField(required=False, min_value=1000, max_value=120000, default=30000)
     ignore_https_errors = serializers.BooleanField(required=False, default=True)
+    generate_excel = serializers.BooleanField(required=False, default=False, help_text="Générer un fichier Excel avec le screenshot")
 
     def validate(self, attrs):
         if not attrs.get('url') and not attrs.get('ip_address'):
@@ -32,4 +34,13 @@ class ScreenshotResponseSerializer(serializers.Serializer):
     width = serializers.IntegerField()
     height = serializers.IntegerField()
     url = serializers.URLField()
+    report_id = serializers.UUIDField(required=False, help_text="ID du rapport généré si Excel demandé")
+    excel_download_url = serializers.URLField(required=False, help_text="URL pour télécharger le fichier Excel")
+
+
+class ScreenshotReportSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ScreenshotReport
+        fields = ['id', 'ip_address', 'protocol', 'url', 'width', 'height', 'created_at', 'user']
+        read_only_fields = ['id', 'created_at']
 

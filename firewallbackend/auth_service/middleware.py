@@ -86,17 +86,17 @@ class RateLimitMiddleware(MiddlewareMixin):
         logger.warning(f"[RateLimit] key={rate_key} user_id={user_id} path={request.path}")
 
         # Get current rate limit data
-        rate_data = cache.get(rate_key, {'count': 0, 'reset_time': time.time() + 60})
+        rate_data = cache.get(rate_key, {'count': 0, 'reset_time': time.time() + 360})
         
         # Check if rate limit window has expired
         if time.time() > rate_data['reset_time']:
-            rate_data = {'count': 0, 'reset_time': time.time() + 420}
+            rate_data = {'count': 0, 'reset_time': time.time() + 360}
         
         # Increment request count
         rate_data['count'] += 1
         
         # Check if rate limit exceeded
-        if rate_data['count'] > 60:  # 60 requests per minute (plus sécurisé)
+        if rate_data['count'] > 100:  # 100 requests per 6 minutes
             logger.warning(f"Rate limit exceeded for IP: {ip} (user_id: {user_id})")
             return HttpResponse(
                 'Rate limit exceeded. Please try again later.',
@@ -104,5 +104,5 @@ class RateLimitMiddleware(MiddlewareMixin):
             )
         
         # Update rate limit data
-        cache.set(rate_key, rate_data, 60)
+        cache.set(rate_key, rate_data, 360)
         return None 

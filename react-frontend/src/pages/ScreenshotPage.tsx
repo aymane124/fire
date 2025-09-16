@@ -1,6 +1,15 @@
 import React, { useState } from 'react';
 import api from '../utils/axiosConfig';
 
+interface ScreenshotResponse {
+  image_base64: string;
+  width: number;
+  height: number;
+  url: string;
+  report_id?: string;
+  excel_download_url?: string;
+}
+
 const ScreenshotPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
@@ -9,30 +18,53 @@ const ScreenshotPage: React.FC = () => {
   const [protocol, setProtocol] = useState<'http' | 'https'>('https');
   const [fullPage, setFullPage] = useState<boolean>(true);
   const [ignoreHttps, setIgnoreHttps] = useState<boolean>(true);
+  const [generateExcel, setGenerateExcel] = useState<boolean>(false);
+  const [excelDownloadUrl, setExcelDownloadUrl] = useState<string | null>(null);
+  const [reportId, setReportId] = useState<string | null>(null);
 
   const handleCapture = async () => {
     setLoading(true);
     setError(null);
     setImageBase64(null);
+    setExcelDownloadUrl(null);
+    setReportId(null);
+    
     try {
       if (!ip.trim()) {
         setError('Please enter firewall IP address');
         setLoading(false);
         return;
       }
+      
       const payload: any = {
         ip_address: ip.trim(),
         protocol,
         full_page: fullPage,
-        ignore_https_errors: ignoreHttps
+        ignore_https_errors: ignoreHttps,
+        generate_excel: generateExcel  // Nouveau paramètre
       };
-      const res = await api.post('/screenshots/capture/', payload);
+      
+      const res = await api.post<ScreenshotResponse>('/screenshots/capture/', payload);
       setImageBase64(res.data.image_base64);
+      
+      // Gérer la réponse Excel
+      if (res.data.excel_download_url) {
+        setExcelDownloadUrl(res.data.excel_download_url);
+        setReportId(res.data.report_id || null);
+      }
+      
     } catch (e: any) {
       const detail = e?.response?.data?.detail || e?.message || 'Unknown error';
       setError(String(detail));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDownloadExcel = () => {
+    if (excelDownloadUrl) {
+      // Ouvrir le téléchargement dans un nouvel onglet
+      window.open(excelDownloadUrl, '_blank');
     }
   };
 
@@ -82,22 +114,55 @@ const ScreenshotPage: React.FC = () => {
           <input type="checkbox" checked={ignoreHttps} onChange={(e) => setIgnoreHttps(e.target.checked)} />
           <span className="text-sm text-slate-700">Ignorer les erreurs HTTPS (certificat autosigné)</span>
         </label>
+        <label className="inline-flex items-center gap-2">
+          <input 
+            type="checkbox" 
+            checked={generateExcel} 
+            onChange={(e) => setGenerateExcel(e.target.checked)} 
+          />
+          <span className="text-sm text-slate-700">Générer un fichier Excel avec la photo</span>
+        </label>
       </div>
 
-      <button
-        onClick={handleCapture}
-        disabled={loading}
-        className="px-4 py-2 rounded bg-purple-700 text-white hover:bg-purple-800 disabled:opacity-50"
-      >
-        {loading ? 'Capturing…' : 'Lancer la capture'}
-      </button>
+      <div className="flex gap-3 mb-4">
+        <button
+          onClick={handleCapture}
+          disabled={loading}
+          className="px-4 py-2 rounded bg-purple-700 text-white hover:bg-purple-800 disabled:opacity-50"
+        >
+          {loading ? 'Capturing…' : 'Lancer la capture'}
+        </button>
+        
+        {excelDownloadUrl && (
+          <button
+            onClick={handleDownloadExcel}
+            className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700 flex items-center gap-2"
+          >
+            📊 Télécharger Excel
+          </button>
+        )}
+      </div>
 
       {error && (
-        <div className="mt-4 text-red-600">{error}</div>
+        <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded text-red-600">
+          {error}
+        </div>
+      )}
+
+      {excelDownloadUrl && (
+        <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded text-green-700">
+          ✅ Fichier Excel généré avec succès ! Cliquez sur "Télécharger Excel" pour le récupérer.
+        </div>
       )}
 
       {imageBase64 && (
         <div className="mt-6">
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-lg font-medium">Screenshot capturé</h3>
+            {reportId && (
+              <span className="text-sm text-gray-500">Rapport ID: {reportId}</span>
+            )}
+          </div>
           <img
             src={`data:image/png;base64,${imageBase64}`}
             alt="Screenshot"

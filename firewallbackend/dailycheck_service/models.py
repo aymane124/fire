@@ -9,10 +9,16 @@ class DailyCheck(models.Model):
     status = models.CharField(max_length=50, choices=[
         ('SUCCESS', 'Success'),
         ('FAILED', 'Failed'),
-        ('PENDING', 'Pending')
+        ('PENDING', 'Pending'),
+        ('CONNECTION_FAILED', 'Connection Failed'),
+        ('PARTIAL_SUCCESS', 'Partial Success'),
+        ('ERROR', 'Error'),
+        ('TIMEOUT', 'Timeout')
     ], default='PENDING')
     notes = models.TextField(blank=True, null=True)
     excel_report = models.TextField(null=True, blank=True)
+    screenshot_base64 = models.TextField(blank=True, null=True, help_text='Base64 encoded screenshot of the firewall dashboard')
+    screenshot_captured = models.BooleanField(default=False, help_text='Whether screenshot was successfully captured')
     historique_dailycheck = models.JSONField(default=dict, blank=True)
 
     class Meta:
