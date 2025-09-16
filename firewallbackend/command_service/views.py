@@ -135,7 +135,10 @@ def config_background_worker():
                 results = []
                 
                 # Créer le répertoire de base pour les configurations
-                documents_path = os.path.expanduser('~/Documents')
+                if os.path.exists('/app'):
+                    documents_path = '/app/reports'
+                else:
+                    documents_path = os.path.expanduser('~/Documents')
                 base_config_dir = os.path.join(documents_path, 'FirewallConfigs')
                 os.makedirs(base_config_dir, exist_ok=True)
                 

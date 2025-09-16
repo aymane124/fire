@@ -52,7 +52,10 @@ def background_task_worker():
                 user = task['user']
                 
                 # Créer le répertoire de base
-                documents_path = os.path.expanduser('~/Documents')
+                if os.path.exists('/app'):
+                    documents_path = '/app/reports'
+                else:
+                    documents_path = os.path.expanduser('~/Documents')
                 base_dir = os.path.join(documents_path, 'DailyCheck')
                 os.makedirs(base_dir, exist_ok=True)
                 
@@ -513,7 +516,10 @@ class DailyCheckViewSet(viewsets.ModelViewSet):
             filename = f'daily_check_{timestamp}.xlsx'
             
             # Create directories
-            documents_path = os.path.expanduser('~/Documents')
+            if os.path.exists('/app'):
+                documents_path = '/app/reports'
+            else:
+                documents_path = os.path.expanduser('~/Documents')
             base_dir = os.path.join(documents_path, 'DailyCheck')
             os.makedirs(base_dir, exist_ok=True)
             

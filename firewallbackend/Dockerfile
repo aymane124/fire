@@ -33,8 +33,9 @@ RUN playwright install --with-deps
 # Copy project
 COPY . /app
 
-# Create non-root user
+# Create non-root user and reports directory
 RUN useradd -m appuser \
+    && mkdir -p /app/reports \
     && chown -R appuser:appuser /app
 RUN chmod +x /app/entrypoint.sh || true \
     && sed -i 's/\r$//' /app/entrypoint.sh || true \

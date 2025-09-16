@@ -21,7 +21,11 @@ class ExcelGenerator:
     """
     
     def __init__(self):
-        self.base_dir = os.path.expanduser('~/Documents/DailyCheck')
+        # Use relative path in Docker container, fallback to Documents for local development
+        if os.path.exists('/app'):
+            self.base_dir = '/app/reports/DailyCheck'
+        else:
+            self.base_dir = os.path.expanduser('~/Documents/DailyCheck')
         os.makedirs(self.base_dir, exist_ok=True)
         self.workbook = None
         self.current_filepath = None
